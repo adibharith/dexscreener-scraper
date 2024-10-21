@@ -1,22 +1,16 @@
 document.getElementById('scrapeButton').addEventListener('click', () => {
+  const tokenLimit = parseInt(document.getElementById('tokenLimit').value, 10); // Get the user-specified limit
+  if (isNaN(tokenLimit) || tokenLimit <= 0) {
+    document.getElementById('output').textContent = 'Please enter a valid number of tokens to scrape.';
+    return;
+  }
+
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     chrome.scripting.executeScript({
       target: { tabId: tabs[0].id },
-      function: () => {
-        const tokens = [];
-        document.querySelectorAll('a.ds-dex-table-row.ds-dex-table-row-top').forEach((tokenElement) => {
-          const href = tokenElement.getAttribute('href');
-          if (href) {
-            tokens.push(href.split('/').pop());
-          }
-        });
-        return tokens;
-      }
+      function: scrapeDexscreener,
+      args: [tokenLimit] // Pass the limit to the content script
     }, (results) => {
-      if (chrome.runtime.lastError) {
-        console.error(chrome.runtime.lastError.message);
-      }
-
       const tokenAddresses = results && results[0].result ? results[0].result : [];
 
       // Display the token addresses in the popup
@@ -53,4 +47,22 @@ function downloadTokenAddresses(addresses) {
 
   // Clean up
   URL.revokeObjectURL(url);
+}
+
+// Content script logic to scrape token addresses, limited by tokenLimit
+function scrapeDexscreener(tokenLimit) {
+  const tokens = [];
+  const tokenElements = document.querySelectorAll('a.ds-dex-table-row.ds-dex-table-row-top');
+
+  tokenElements.forEach((tokenElement, index) => {
+    if (index >= tokenLimit) return; // Stop once we reach the limit
+
+    const href = tokenElement.getAttribute('href');
+    if (href) {
+      const tokenAddress = href.split('/').pop();
+      tokens.push(tokenAddress);
+    }
+  });
+
+  return tokens;
 }
